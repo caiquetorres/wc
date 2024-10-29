@@ -4,33 +4,24 @@ import (
 	"log"
 	"os"
 
-	"github.com/caiquetorres/wc/internal"
+	"github.com/caiquetorres/wc/internal/options"
 	"github.com/caiquetorres/wc/internal/stats"
-	streams "github.com/caiquetorres/wc/internal/stream"
+	"github.com/caiquetorres/wc/internal/tool"
 )
 
+var logger = log.New(os.Stderr, "ccwc error: ", 0)
+
 func main() {
-	options := internal.ReadOptions()
-	var readers []*streams.StreamReader
-	if len(options.FilePaths) == 0 {
-		reader := streams.NewStdinStreamReader()
-		defer reader.Close()
-		readers = append(readers, reader)
-	} else {
-		for _, filePath := range options.FilePaths {
-			reader, err := streams.NewStreamReader(filePath)
-			defer reader.Close()
-			if err != nil {
-				stderr := new(log.Logger)
-				stderr.SetOutput(os.Stderr)
-				stderr.Println("ccwc error: no such file or directory")
-				return
-			}
-			readers = append(readers, reader)
-		}
+	opt := options.ReadOptions()
+	statArr, err := tool.Wc(opt)
+	if err != nil {
+		logger.Println(err.Error())
 	}
-	statsArr := stats.NewStatsArr(readers, options)
-	for _, stats := range statsArr {
-		stats.Print(options)
+	for _, stat := range statArr {
+		stat.Print(opt)
+	}
+	if len(statArr) > 1 {
+		stat := stats.MergeStats(statArr)
+		stat.Print(opt)
 	}
 }

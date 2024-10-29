@@ -3,3 +3,6 @@ build:
 
 run: build
 	@./bin/wc
+
+test:
+	@go test -v ./... -short
