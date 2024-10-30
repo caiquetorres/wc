@@ -1,28 +1,32 @@
 package streams
 
 import (
-	"bufio"
+	"fmt"
 	"io"
 )
 
+const chunkSize = 1024
+
 type StreamReader struct {
-	name     string
-	currByte byte
-	currErr  error
-	reader   io.ReadCloser
-	source   *bufio.Reader
+	name   string
+	ptr    uint
+	err    error
+	size   uint
+	buffer [chunkSize]byte
+	reader io.ReadCloser
 }
 
 func NewStreamReader(rd io.ReadCloser, rdName string) *StreamReader {
-	reader := bufio.NewReader(rd)
-	currByte, currErr := reader.ReadByte()
-	return &StreamReader{
-		name:     rdName,
-		currByte: currByte,
-		currErr:  currErr,
-		source:   reader,
-		reader:   rd,
+	stream := StreamReader{
+		name:   rdName,
+		ptr:    0,
+		err:    nil,
+		size:   0,
+		buffer: [chunkSize]byte{},
+		reader: rd,
 	}
+	stream.err = stream.fill()
+	return &stream
 }
 
 func (s *StreamReader) Name() string {
@@ -34,11 +38,32 @@ func (s *StreamReader) Close() error {
 }
 
 func (s *StreamReader) Peek() (byte, error) {
-	return s.currByte, s.currErr
+	if int(s.ptr) < len(s.buffer) {
+		return s.buffer[s.ptr], nil
+	}
+	return 0, s.err
 }
 
 func (s *StreamReader) Next() (byte, error) {
-	currByte, currErr := s.currByte, s.currErr
-	s.currByte, s.currErr = s.source.ReadByte()
-	return currByte, currErr
+	// If the current position plus 1 exceeds the buffer size, refill the buffer.
+	if s.ptr+1 > s.size {
+		if err := s.fill(); err != nil {
+			return 0, err
+		}
+	}
+	ch, _ := s.Peek()
+	s.ptr++
+	return ch, nil
+}
+
+func (s *StreamReader) fill() error {
+	n, err := s.reader.Read(s.buffer[:])
+	// If err is not nil or no new data is read into the buffer, it indicates the
+	// end of the input.
+	if err != nil && err != io.EOF || n == 0 {
+		return fmt.Errorf("end of stream")
+	}
+	s.size = uint(n)
+	s.ptr = 0
+	return nil
 }

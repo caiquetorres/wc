@@ -26,10 +26,11 @@ func TestNewStreamReader(t *testing.T) {
 	data := []byte("hello")
 	mockReader := &mockReadCloser{Reader: bytes.NewReader(data)}
 	stream := NewStreamReader(mockReader, "testStream")
+	peekByte, peekErr := stream.Peek()
 
 	assert.Equal(t, stream.name, "testStream")
-	assert.Equal(t, stream.currByte, data[0])
-	assert.Nil(t, stream.currErr)
+	assert.Equal(t, peekByte, data[0])
+	assert.Nil(t, peekErr)
 }
 
 func TestStreamReader_Name(t *testing.T) {
